@@ -26,13 +26,12 @@ func init() {
 	}
 }
 
-type id struct {
-	owner [20]byte
+type Id struct {
 	topic [32]byte
 	index [9]byte
 }
 
-func newId(owner, topic []byte, epoch uint64, level uint8) (*id, error) {
+func NewId(topic []byte, epoch uint64, level uint8) (*Id, error) {
 	hasher := hashPool.Get().(hash.Hash)
 	defer func() {
 		hasher.Reset()
@@ -43,18 +42,18 @@ func newId(owner, topic []byte, epoch uint64, level uint8) (*id, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return &id{
-		owner: owner,
-		topic: hasher.Sum(),
+	sum := hasher.Sum(nil)
+	i := &Id{
 		index: newIndex(epoch, level),
 	}
+	copy(i.topic[:], sum)
+	return i, nil
 }
 
-func (i *id) identifier() []byte {
+func (i *Id) Identifier() []byte {
 	b := make([]byte, 41)
-	copy(b, i.topic)
-	copy(b[32:], i.index)
+	copy(b, i.topic[:])
+	copy(b[32:], i.index[:])
 	hasher := hashPool.Get().(hash.Hash)
 	defer func() {
 		hasher.Reset()
@@ -63,50 +62,56 @@ func (i *id) identifier() []byte {
 
 	_, err := hasher.Write(b)
 	if err != nil {
-		return nil, err
+		//return nil, err
+		panic(err)
 	}
 
-	return hasher.Sum()
+	return hasher.Sum(nil)
+}
+
+func (i *Id) Bytes() []byte {
+	return []byte{}
 }
 
 // address returns the chunk address for this update
-func (i *id) address(owner []byte) []byte {
-	b := make([]byte, 32+20)
-	id := i.identifier()
-	copy(b, id)
-	copy(b[32:], i.owner)
-	hasher := hashPool.Get().(hash.Hash)
-	defer func() {
-		hasher.Reset()
-		hashPool.Put(hasher)
-	}()
+//func (i *Id) Address() []byte {
+//b := make([]byte, 32+20)
+//id := i.Identifier()
+//copy(b, id)
+//copy(b[32:], i.owner)
+//hasher := hashPool.Get().(hash.Hash)
+//defer func() {
+//hasher.Reset()
+//hashPool.Put(hasher)
+//}()
 
-	_, err := hasher.Write(b)
-	if err != nil {
-		return nil, err
-	}
+//_, err := hasher.Write(b)
+//if err != nil {
+//panic(err)
+//}
 
-	return hasher.Sum()
-}
+//sum, err := hasher.Sum()
+//if err != nil {
+//panic(err)
+//}
+//return sum
+//}
 
 // newIndexReturns a new index based on a unix epoch in uint64 representation and a level
 func newIndex(t uint64, l uint8) [9]byte {
-	b := make([]byte, 9)
-	binary.LittleEndian.PutUint64(b, t)
+	var b [9]byte
+	binary.LittleEndian.PutUint64(b[:], t)
 	b[8] = l
 	return b
 }
 
 // Lookup retrieves the latest feed update
 func SimpleLookup(ctx context.Context, getter storage.Getter, user common.Address, topic []byte) ([]byte, error) {
-	t := time.Now()
-	//a
-
-	mask := 1 << (64 - 1)
+	//t := time.Now()
 
 	// find first bit of our time
-	for {
+	//for {
 
-	}
-
+	//}
+	return nil, nil
 }

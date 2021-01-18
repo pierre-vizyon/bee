@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethersphere/bee/pkg/soc"
 	"github.com/ethersphere/bee/pkg/storage"
 	"golang.org/x/crypto/sha3"
 )
 
-var retrieveTimeout = 10 * time.Second
+var (
+	retrieveTimeout = 10 * time.Second
+	maxLevel        = 32
+)
 
 // hashPool contains a pool of ready hashers
 var hashPool sync.Pool
@@ -70,7 +74,24 @@ func (i *Id) Identifier() []byte {
 }
 
 func (i *Id) Bytes() []byte {
-	return []byte{}
+	hasher := hashPool.Get().(hash.Hash)
+	defer func() {
+		hasher.Reset()
+		hashPool.Put(hasher)
+	}()
+
+	_, err := hasher.Write(i.topic[:])
+	if err != nil {
+		//return nil, err
+		panic(err)
+	}
+	_, err = hasher.Write(i.index[:])
+	if err != nil {
+		//return nil, err
+		panic(err)
+	}
+
+	return hasher.Sum(nil)
 }
 
 // address returns the chunk address for this update
@@ -106,12 +127,30 @@ func newIndex(t uint64, l uint8) [9]byte {
 }
 
 // Lookup retrieves the latest feed update
-func SimpleLookup(ctx context.Context, getter storage.Getter, user common.Address, topic []byte) ([]byte, error) {
-	//t := time.Now()
+func SimpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address, topic []byte, time uint64) ([]byte, error) {
+	return simpleLookupAt(ctx, getter, user, topic, 0, time, 32, nil)
+}
 
-	// find first bit of our time
-	//for {
+func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address, topic []byte, current, time uint64, level uint8, data []byte) ([]byte, error) {
+	id, _ := NewId(topic, current, level)
+	owner, _ := soc.NewOwner(user[:])
+	addr, err := soc.CreateAddress(id.Bytes(), owner)
+	if err != nil {
+		return nil, err
+	}
+	data1, err := getter.Get(ctx, storage.ModeGetRequest, addr)
+	if err != nil {
+		if data == nil {
+			return nil, err
+		}
+		return data, nil
+	}
 
-	//}
-	return nil, nil
+	dd, _ := soc.FromChunk(data1)
+	branch := time & (1 << level)
+	if branch == 0 {
+		return simpleLookupAt(ctx, getter, user, topic, current-1, time, level-1, dd.Chunk.Data()) // fetch right
+	}
+	current |= branch
+	return simpleLookupAt(ctx, getter, user, topic, current, time, level-1, dd.Chunk.Data()) // fetch right
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethersphere/bee/pkg/file"
+	"github.com/ethersphere/bee/pkg/storage"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -98,9 +98,9 @@ func newIndex(t uint64, l uint8) [9]byte {
 }
 
 // Lookup retrieves the latest feed update
-func Lookup(ctx context.Context, ls file.LoadSaver, user common.Address, topic []byte) (interface{}, error) {
+func SimpleLookup(ctx context.Context, getter storage.Getter, user common.Address, topic []byte) ([]byte, error) {
 	t := time.Now()
-	a
+	//a
 
 	mask := 1 << (64 - 1)
 

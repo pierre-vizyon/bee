@@ -13,61 +13,73 @@ import (
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/storage/mock"
 	testingc "github.com/ethersphere/bee/pkg/storage/testing"
+	"github.com/ethersphere/bee/pkg/swarm"
 )
 
-func TestSimpleLookup_RootEpoch(t *testing.T) {
-	storer := mock.NewStorer()
-	topic := []byte("testtopic")
-	//updateData := []byte("updateData")
-	level := uint8(32)
+var (
+	topic      = []byte("testtopic")
+	mockChunk  = testingc.GenerateTestRandomChunk()
+	lastUpdate = testingc.GenerateTestRandomChunk()
+)
+
+func TestSimpleLookup(t *testing.T) {
 	pk, _ := crypto.GenerateSecp256k1Key()
 	signer := crypto.NewDefaultSigner(pk)
-	i, err := feeds.NewId(topic, 0, level)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ethAddr, err := signer.EthereumAddress()
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, tc := range []struct {
+		desc    string
+		updates []update
+	}{
+		{
+			desc:    "one update at root",
+			updates: []update{updateAt(32, 0)},
+		},
+	} {
+		storer := mock.NewStorer()
+		for i, v := range tc.updates {
+			id, err := feeds.NewId(topic, v.epoch, v.level)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ch swarm.Chunk
+			if i == len(tc.updates)-1 {
+				// create the soc from the different chunk, so we can differentiate the correct update then the previous ones
+				ch, err = soc.NewChunk(id.Bytes(), lastUpdate, signer)
+			} else {
+				ch, err = soc.NewChunk(id.Bytes(), mockChunk, signer)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	mockChunk := testingc.GenerateTestRandomChunk()
-	ch, err := soc.NewChunk(i.Bytes(), mockChunk, signer)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println("test chunk addr ", ch.Address().String())
-	_, err = storer.Put(context.Background(), storage.ModePutUpload, ch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := uint64(time.Now().Unix())
+			fmt.Println("test chunk addr ", ch.Address().String())
+			_, err = storer.Put(context.Background(), storage.ModePutUpload, ch)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		now := uint64(time.Now().Unix())
 
-	result, err := feeds.SimpleLookupAt(context.Background(), storer, ethAddr, topic, now)
-	if err != nil {
-		t.Fatal(err)
-	}
+		result, err := feeds.SimpleLookupAt(context.Background(), storer, ethAddr, topic, now)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if !bytes.Equal(result, mockChunk.Data()) {
-		t.Fatalf("result mismatch. want %v got %v", mockChunk.Data(), result)
+		if !bytes.Equal(result, lastUpdate.Data()) {
+			t.Fatalf("result mismatch. want %v got %v", mockChunk.Data(), result)
+		}
+
 	}
 }
 
-//func newChunk(content []byte) swarm.Chunk {
-//s
-//hasher := bmtpool.Get()
-//defer bmtpool.Put(hasher)
+func updateAt(l uint8, e uint64) update {
+	return update{l, e}
+}
 
-//// execute hash, compare and return result
-//err := hasher.SetSpanBytes(span)
-//if err != nil {
-//return false
-//}
-//_, err = hasher.Write(content)
-//if err != nil {
-//return false
-//}
-//s := hasher.Sum(nil)
-
-//}
+type update struct {
+	level uint8
+	epoch uint64
+}

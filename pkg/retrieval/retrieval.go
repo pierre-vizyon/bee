@@ -72,6 +72,7 @@ func (s *Service) Protocol() p2p.ProtocolSpec {
 			{
 				Name:    streamName,
 				Handler: s.handler,
+				Headler: s.pricer.Headler,
 			},
 		},
 	}

@@ -1,9 +1,12 @@
+// Copyright 2021 The Swarm Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package feeds_test
 
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,28 +33,33 @@ func TestSimpleLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		desc    string
-		updates []update // the last update we'd like to find must be the last element in this list
+		desc       string
+		updates    []update // the last update we'd like to find must be the last element in this list
+		lookupTime uint64
 	}{
-		//{
-		//desc:    "one update at root",
-		//updates: []update{updateAt(32, 0)},
-		//},
-		//{
-		//desc:    "one update at root, one at the next level (left)",
-		//updates: []update{updateAt(32, 0), updateAt(31, 0)},
-		//},
-		//{
-		//desc:    "one update at root, one at the next level (left), and another one left down",
-		//updates: []update{updateAt(32, 0), updateAt(31, 0), updateAt(30, 0)},
-		//},
+		{
+			desc:    "one update at root",
+			updates: []update{updateAt(0, 0)},
+		},
+		{
+			desc:    "one update at root, one at the next level (left)",
+			updates: []update{updateAt(0, 0), updateAt(1, 0)},
+		},
+		{
+			desc:    "one update at root, one at the next level (left), and another one left down",
+			updates: []update{updateAt(0, 0), updateAt(1, 0), updateAt(2, 0)},
+		},
 		{
 			desc:    "one update at root, down left, left and right",
 			updates: []update{updateAt(0, 0), updateAt(1, 0), updateAt(2, 0), updateAt(2, (1 << 30))},
 		},
+		{
+			desc:       "one update at root, down left, left and right",
+			updates:    []update{updateAt(0, 0), updateAt(1, 0), updateAt(2, 0), updateAt(2, (1 << 30)), updateAt(1, (1 << 31))},
+			lookupTime: 2147483648 + 10,
+		},
 	} {
 		storer := mock.NewStorer()
-		fmt.Println("update at ", 1<<29)
 		for i, v := range tc.updates {
 			id, err := feeds.NewId(topic, v.epoch, v.level)
 			if err != nil {
@@ -68,15 +76,17 @@ func TestSimpleLookup(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			fmt.Println("test chunk addr ", ch.Address().String())
 			_, err = storer.Put(context.Background(), storage.ModePutUpload, ch)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
-		now := uint64(time.Now().Unix())
+		lookupTime := uint64(time.Now().Unix())
+		if tc.lookupTime != 0 {
+			lookupTime = tc.lookupTime
+		}
 
-		result, err := feeds.SimpleLookupAt(context.Background(), storer, ethAddr, topic, now)
+		result, err := feeds.SimpleLookupAt(context.Background(), storer, ethAddr, topic, lookupTime)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,12 +1,14 @@
+// Copyright 2021 The Swarm Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package feeds
 
 import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash"
-	"strconv"
 	"sync"
 	"time"
 
@@ -112,9 +114,7 @@ func SimpleLookupAt(ctx context.Context, getter storage.Getter, user common.Addr
 
 func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address,
 	topic []byte, current, time uint64, level uint8, data []byte) ([]byte, error) {
-	fmt.Println("simple lookup", "current", current, "time", time, "level", level)
 	if current > time {
-		fmt.Println("too late")
 		return nil, errors.New("too late")
 	}
 	id, _ := NewId(topic, current, level)
@@ -123,26 +123,18 @@ func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Addr
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("get on", addr.String())
 	data1, err := getter.Get(ctx, storage.ModeGetRequest, addr)
 	if err != nil {
-		fmt.Println("get error, return", err)
 		return data, err
 	}
-	level++
 
+	level++
 	// fetching the current level was successful, then let's set data to data1
+
 	dd, _ := soc.FromChunk(data1)
 	data = dd.Chunk.Data()
 	right := current | (1 << (32 - level))
-	fmt.Println("right", right)
-	fmt.Println("go right", strconv.FormatUint(right, 2), level)
 	if d, err := simpleLookupAt(ctx, getter, user, topic, right, time, level, data); err != nil {
-		fmt.Println("no go for right side")
-		//if current > 0 {
-		//current--
-		//}
-		fmt.Println("go left", strconv.FormatUint(current, 2))
 		res, err := simpleLookupAt(ctx, getter, user, topic, current, time, level, data) // fetch left
 		if err != nil {
 			return data, nil

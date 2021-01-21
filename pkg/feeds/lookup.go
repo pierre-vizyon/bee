@@ -3,7 +3,10 @@ package feeds
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"hash"
+	"strconv"
 	"sync"
 	"time"
 
@@ -94,30 +97,6 @@ func (i *Id) Bytes() []byte {
 	return hasher.Sum(nil)
 }
 
-// address returns the chunk address for this update
-//func (i *Id) Address() []byte {
-//b := make([]byte, 32+20)
-//id := i.Identifier()
-//copy(b, id)
-//copy(b[32:], i.owner)
-//hasher := hashPool.Get().(hash.Hash)
-//defer func() {
-//hasher.Reset()
-//hashPool.Put(hasher)
-//}()
-
-//_, err := hasher.Write(b)
-//if err != nil {
-//panic(err)
-//}
-
-//sum, err := hasher.Sum()
-//if err != nil {
-//panic(err)
-//}
-//return sum
-//}
-
 // newIndexReturns a new index based on a unix epoch in uint64 representation and a level
 func newIndex(t uint64, l uint8) [9]byte {
 	var b [9]byte
@@ -131,26 +110,41 @@ func SimpleLookupAt(ctx context.Context, getter storage.Getter, user common.Addr
 	return simpleLookupAt(ctx, getter, user, topic, 0, time, 32, nil)
 }
 
-func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address, topic []byte, current, time uint64, level uint8, data []byte) ([]byte, error) {
+func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address,
+	topic []byte, current, time uint64, level uint8, data []byte) ([]byte, error) {
+	fmt.Println("simple lookup", "current", current, "time", time, "level", level)
+	if current > time {
+		fmt.Println("too late")
+		return nil, errors.New("too late")
+	}
 	id, _ := NewId(topic, current, level)
 	owner, _ := soc.NewOwner(user[:])
 	addr, err := soc.CreateAddress(id.Bytes(), owner)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("get on", addr.String())
 	data1, err := getter.Get(ctx, storage.ModeGetRequest, addr)
 	if err != nil {
-		if data == nil {
-			return nil, err
-		}
-		return data, nil
+		fmt.Println("get error, return", err)
+		return data, err
 	}
 
+	// fetching the current level was successful, then let's set data to data1
 	dd, _ := soc.FromChunk(data1)
-	branch := time & (1 << level)
-	if branch == 0 {
-		return simpleLookupAt(ctx, getter, user, topic, current-1, time, level-1, dd.Chunk.Data()) // fetch right
+	data = dd.Chunk.Data()
+
+	right := current | (1 << (level))
+	fmt.Println("right", right)
+	fmt.Println("get right", strconv.FormatUint(right, 2))
+	if d, err := simpleLookupAt(ctx, getter, user, topic, right, time, level-1, data); err != nil {
+		fmt.Println("no go")
+		if current > 0 {
+			current--
+		}
+		fmt.Println("get left", strconv.FormatUint(current, 2))
+		return simpleLookupAt(ctx, getter, user, topic, current, time, level-1, data) // fetch left
+	} else {
+		return d, err
 	}
-	current |= branch
-	return simpleLookupAt(ctx, getter, user, topic, current, time, level-1, dd.Chunk.Data()) // fetch right
 }

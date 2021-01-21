@@ -31,14 +31,27 @@ func TestSimpleLookup(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		desc    string
-		updates []update
+		updates []update // the last update we'd like to find must be the last element in this list
 	}{
+		//{
+		//desc:    "one update at root",
+		//updates: []update{updateAt(32, 0)},
+		//},
+		//{
+		//desc:    "one update at root, one at the next level (left)",
+		//updates: []update{updateAt(32, 0), updateAt(31, 0)},
+		//},
+		//{
+		//desc:    "one update at root, one at the next level (left), and another one left down",
+		//updates: []update{updateAt(32, 0), updateAt(31, 0), updateAt(30, 0)},
+		//},
 		{
-			desc:    "one update at root",
-			updates: []update{updateAt(32, 0)},
+			desc:    "one update at root, down left, left and right",
+			updates: []update{updateAt(32, 0), updateAt(31, 0), updateAt(30, 0), updateAt(30, (1 << 30))},
 		},
 	} {
 		storer := mock.NewStorer()
+		fmt.Println("update at woot", 1<<30)
 		for i, v := range tc.updates {
 			id, err := feeds.NewId(topic, v.epoch, v.level)
 			if err != nil {
@@ -46,7 +59,7 @@ func TestSimpleLookup(t *testing.T) {
 			}
 			var ch swarm.Chunk
 			if i == len(tc.updates)-1 {
-				// create the soc from the different chunk, so we can differentiate the correct update then the previous ones
+				// create the last update from the different mock chunk
 				ch, err = soc.NewChunk(id.Bytes(), lastUpdate, signer)
 			} else {
 				ch, err = soc.NewChunk(id.Bytes(), mockChunk, signer)
@@ -69,7 +82,7 @@ func TestSimpleLookup(t *testing.T) {
 		}
 
 		if !bytes.Equal(result, lastUpdate.Data()) {
-			t.Fatalf("result mismatch. want %v got %v", mockChunk.Data(), result)
+			t.Fatalf("wrong result")
 		}
 
 	}

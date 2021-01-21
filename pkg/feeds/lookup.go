@@ -107,7 +107,7 @@ func newIndex(t uint64, l uint8) [9]byte {
 
 // Lookup retrieves the latest feed update
 func SimpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address, topic []byte, time uint64) ([]byte, error) {
-	return simpleLookupAt(ctx, getter, user, topic, 0, time, 32, nil)
+	return simpleLookupAt(ctx, getter, user, topic, 0, time, 0, nil)
 }
 
 func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Address,
@@ -129,21 +129,25 @@ func simpleLookupAt(ctx context.Context, getter storage.Getter, user common.Addr
 		fmt.Println("get error, return", err)
 		return data, err
 	}
+	level++
 
 	// fetching the current level was successful, then let's set data to data1
 	dd, _ := soc.FromChunk(data1)
 	data = dd.Chunk.Data()
-
-	right := current | (1 << (level))
+	right := current | (1 << (32 - level))
 	fmt.Println("right", right)
-	fmt.Println("get right", strconv.FormatUint(right, 2))
-	if d, err := simpleLookupAt(ctx, getter, user, topic, right, time, level-1, data); err != nil {
-		fmt.Println("no go")
-		if current > 0 {
-			current--
+	fmt.Println("go right", strconv.FormatUint(right, 2), level)
+	if d, err := simpleLookupAt(ctx, getter, user, topic, right, time, level, data); err != nil {
+		fmt.Println("no go for right side")
+		//if current > 0 {
+		//current--
+		//}
+		fmt.Println("go left", strconv.FormatUint(current, 2))
+		res, err := simpleLookupAt(ctx, getter, user, topic, current, time, level, data) // fetch left
+		if err != nil {
+			return data, nil
 		}
-		fmt.Println("get left", strconv.FormatUint(current, 2))
-		return simpleLookupAt(ctx, getter, user, topic, current, time, level-1, data) // fetch left
+		return res, nil
 	} else {
 		return d, err
 	}

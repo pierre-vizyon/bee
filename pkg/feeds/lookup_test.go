@@ -47,11 +47,11 @@ func TestSimpleLookup(t *testing.T) {
 		//},
 		{
 			desc:    "one update at root, down left, left and right",
-			updates: []update{updateAt(32, 0), updateAt(31, 0), updateAt(30, 0), updateAt(30, (1 << 30))},
+			updates: []update{updateAt(0, 0), updateAt(1, 0), updateAt(2, 0), updateAt(2, (1 << 30))},
 		},
 	} {
 		storer := mock.NewStorer()
-		fmt.Println("update at woot", 1<<30)
+		fmt.Println("update at ", 1<<29)
 		for i, v := range tc.updates {
 			id, err := feeds.NewId(topic, v.epoch, v.level)
 			if err != nil {
@@ -84,7 +84,6 @@ func TestSimpleLookup(t *testing.T) {
 		if !bytes.Equal(result, lastUpdate.Data()) {
 			t.Fatalf("wrong result")
 		}
-
 	}
 }
 

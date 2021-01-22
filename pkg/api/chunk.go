@@ -28,6 +28,7 @@ func (s *server) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		tag *tags.Tag
 		ctx = r.Context()
+		err error
 	)
 
 	if h := r.Header.Get(SwarmTagUidHeader); h != "" {
@@ -58,7 +59,7 @@ func (s *server) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		if jsonhttp.HandleBodyReadError(err, w) {
 			return
 		}
-		s.Logger.Debugf("chunk upload: read chunk data error: %v, addr %s", err, address)
+		s.Logger.Debugf("chunk upload: read chunk data error: %v", err)
 		s.Logger.Error("chunk upload: read chunk data error")
 		jsonhttp.InternalServerError(w, "cannot read chunk data")
 		return
@@ -74,7 +75,7 @@ func (s *server) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	hasher := bmtpool.Get()
 	defer bmtpool.Put(hasher)
 
-	err := hasher.SetSpanBytes(data[:swarm.SpanSize])
+	err = hasher.SetSpanBytes(data[:swarm.SpanSize])
 	if err != nil {
 		return
 	}
@@ -84,7 +85,7 @@ func (s *server) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	address = swarm.NewAddress(hasher.Sum(nil))
+	address := swarm.NewAddress(hasher.Sum(nil))
 	chunk := swarm.NewChunk(address, data)
 
 	seen, err := s.Storer.Put(ctx, requestModePut(r), chunk)
